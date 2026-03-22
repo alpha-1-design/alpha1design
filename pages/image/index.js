@@ -27,86 +27,91 @@ export default function ImageCompressor() {
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress]     = useState(0);
   const [alreadyOptimal, setAlreadyOptimal] = useState(false);
-  const fileRef = useRef();
+  const fileRef   = useRef();
+  const imgRef    = useRef();
+  const fileStore = useRef();
 
-  const compress = useCallback((file, q, fmt) => {
+  // Compress from already-loaded image element — no second FileReader
+  const compressFromImg = useCallback((img, originalSize, q, fmt) => {
     setProcessing(true);
     setProgress(0);
     setAlreadyOptimal(false);
     setCompressed(null);
 
-    // Animate progress bar
     let prog = 0;
     const interval = setInterval(() => {
-      prog += Math.random() * 20;
+      prog += Math.random() * 22;
       if (prog >= 85) { clearInterval(interval); prog = 85; }
       setProgress(Math.round(prog));
-    }, 100);
+    }, 80);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        setTimeout(() => {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          if (fmt === 'image/jpeg') {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-          }
-          ctx.drawImage(img, 0, 0);
-          const useQuality = fmt === 'image/png' ? undefined : q / 100;
-          canvas.toBlob((blob) => {
-            clearInterval(interval);
-            setProgress(100);
-            setTimeout(() => {
-              if (blob.size >= file.size) {
-                setAlreadyOptimal(true);
-                setCompressed({ src: e.target.result, size: file.size, blob: null, optimal: true });
-              } else {
-                setCompressed({ src: URL.createObjectURL(blob), size: blob.size, blob, optimal: false });
-              }
-              setProcessing(false);
-            }, 300);
-          }, fmt, useQuality);
-        }, 100);
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+    // Use setTimeout so the progress bar paint happens first
+    setTimeout(() => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width  = img.naturalWidth  || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d');
+        if (fmt === 'image/jpeg') {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        ctx.drawImage(img, 0, 0);
+        const useQuality = fmt === 'image/png' ? undefined : q / 100;
+        canvas.toBlob((blob) => {
+          clearInterval(interval);
+          setProgress(100);
+          setTimeout(() => {
+            if (!blob || blob.size >= originalSize) {
+              setAlreadyOptimal(true);
+              setCompressed({ src: img.src, size: originalSize, blob: null, optimal: true });
+            } else {
+              setCompressed({ src: URL.createObjectURL(blob), size: blob.size, blob, optimal: false });
+            }
+            setProcessing(false);
+          }, 250);
+        }, fmt, useQuality);
+      } catch (e) {
+        clearInterval(interval);
+        setProcessing(false);
+      }
+    }, 50);
   }, []);
 
   const processFile = useCallback((file) => {
     if (!file || !file.type.startsWith('image/')) return;
+    setCompressed(null);
+    setAlreadyOptimal(false);
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        setOriginal({ src: e.target.result, size: file.size, name: file.name, w: img.width, h: img.height, file });
-        compress(file, quality, format);
+        imgRef.current   = img;
+        fileStore.current = file;
+        setOriginal({
+          src:  e.target.result,
+          size: file.size,
+          name: file.name,
+          w:    img.naturalWidth,
+          h:    img.naturalHeight,
+        });
+        compressFromImg(img, file.size, quality, format);
       };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
-  }, [quality, format, compress]);
+  }, [quality, format, compressFromImg]);
 
-  const handleQualityChange = (e) => {
-    const q = parseInt(e.target.value);
-    setQuality(q);
-    if (original?.file) compress(original.file, q, format);
-  };
+  const recompress = useCallback((q, fmt) => {
+    if (imgRef.current && fileStore.current) {
+      compressFromImg(imgRef.current, fileStore.current.size, q, fmt);
+    }
+  }, [compressFromImg]);
 
-  const handleFormatChange = (f) => {
-    setFormat(f);
-    if (original?.file) compress(original.file, quality, f);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault(); setDragging(false);
-    processFile(e.dataTransfer.files?.[0]);
-  };
+  const handleQualityChange = (e) => { const q = parseInt(e.target.value); setQuality(q); recompress(q, format); };
+  const handleFormatChange  = (f)  => { setFormat(f); recompress(quality, f); };
+  const handleDrop = (e) => { e.preventDefault(); setDragging(false); processFile(e.dataTransfer.files?.[0]); };
 
   const handleDownload = () => {
     if (!compressed) return;
@@ -115,9 +120,9 @@ export default function ImageCompressor() {
       a.href = original.src; a.download = original.name; a.click(); return;
     }
     const ext = FORMATS.find(f => f.id === format)?.ext || 'jpg';
-    const url = URL.createObjectURL(compressed.blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `a1d-compressed.${ext}`; a.click();
+    a.href = URL.createObjectURL(compressed.blob);
+    a.download = `a1d-compressed.${ext}`; a.click();
   };
 
   useShortcut([{ key: 'd', meta: true, action: handleDownload }]);
@@ -161,7 +166,6 @@ export default function ImageCompressor() {
           </div>
         ) : (
           <>
-            {/* Progress bar */}
             {processing && (
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -169,19 +173,17 @@ export default function ImageCompressor() {
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--img)', fontWeight: '700' }}>{progress}%</span>
                 </div>
                 <div style={{ height: '6px', background: 'var(--surface2)', borderRadius: '100px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: '100px', background: 'linear-gradient(90deg, var(--img), #34d399)', width: `${progress}%`, transition: 'width 120ms ease', boxShadow: '0 0 8px rgba(16,185,129,0.5)' }} />
+                  <div style={{ height: '100%', borderRadius: '100px', background: 'linear-gradient(90deg, var(--img), #34d399)', width: `${progress}%`, transition: 'width 100ms ease', boxShadow: '0 0 8px rgba(16,185,129,0.5)' }} />
                 </div>
               </div>
             )}
 
-            {/* Already optimal banner */}
             {alreadyOptimal && !processing && (
               <div style={{ padding: '14px 16px', borderRadius: '10px', marginBottom: '20px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: 'var(--clr)', fontFamily: 'var(--font-mono)', fontSize: '13px' }}>
-                ✦ Already highly optimized — compressing further would increase size. Original served.
+                ✦ Already highly optimized — serving original.
               </div>
             )}
 
-            {/* Controls */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '16px', marginBottom: '20px' }}>
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -204,13 +206,12 @@ export default function ImageCompressor() {
               </div>
             </div>
 
-            {/* Stats */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '20px' }}>
               {[
-                { label: 'Original',   value: formatBytes(original.size),                                              color: 'var(--text)'  },
-                { label: 'Output',     value: compressed ? formatBytes(compressed.size) : '…',                         color: 'var(--img)'   },
-                { label: 'Saved',      value: compressed ? (compressed.optimal ? 'Optimal' : `${saving}%`) : '…',     color: saving > 0 ? 'var(--img)' : 'var(--clr)' },
-                { label: 'Dimensions', value: `${original.w}×${original.h}`,                                          color: 'var(--muted)' },
+                { label: 'Original',   value: formatBytes(original.size), color: 'var(--text)' },
+                { label: 'Output',     value: compressed ? formatBytes(compressed.size) : '…', color: 'var(--img)' },
+                { label: 'Saved',      value: compressed ? (compressed.optimal ? 'Optimal' : `${saving}%`) : '…', color: saving > 0 ? 'var(--img)' : 'var(--clr)' },
+                { label: 'Dimensions', value: `${original.w}×${original.h}`, color: 'var(--muted)' },
               ].map(({ label, value, color }) => (
                 <div key={label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', textAlign: 'center' }}>
                   <span className="label" style={{ display: 'block', marginBottom: '4px' }}>{label}</span>
@@ -219,7 +220,6 @@ export default function ImageCompressor() {
               ))}
             </div>
 
-            {/* Preview */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
               {[
                 { label: 'Original', src: original.src, size: original.size },
@@ -234,10 +234,7 @@ export default function ImageCompressor() {
                     {src
                       ? <img src={src} alt={label} style={{ maxWidth: '100%', maxHeight: '180px', borderRadius: '4px', objectFit: 'contain' }} />
                       : processing
-                        ? <div style={{ textAlign: 'center' }}>
-                            <Icons.Loader size={24} color="var(--img)" />
-                            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginTop: '8px' }}>Processing...</p>
-                          </div>
+                        ? <div style={{ textAlign: 'center' }}><Icons.Loader size={24} color="var(--img)" /><p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', marginTop: '8px' }}>Processing...</p></div>
                         : <span style={{ color: 'var(--muted2)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>Waiting…</span>
                     }
                   </div>
@@ -245,13 +242,12 @@ export default function ImageCompressor() {
               ))}
             </div>
 
-            {/* Actions */}
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={handleDownload} disabled={!compressed || processing} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 22px', borderRadius: '8px', background: compressed && !processing ? 'var(--img)' : 'var(--surface2)', color: compressed && !processing ? '#000' : 'var(--muted)', border: 'none', fontWeight: '700', fontSize: '14px', cursor: compressed && !processing ? 'pointer' : 'not-allowed', transition: 'all var(--transition)' }}>
                 {processing ? <Icons.Loader size={16} color="currentColor" /> : <Icons.Download size={16} color="currentColor" />}
                 {processing ? `${progress}%` : alreadyOptimal ? 'Download Original' : 'Download'}
               </button>
-              <button onClick={() => { setOriginal(null); setCompressed(null); setQuality(80); setFormat('image/jpeg'); setProgress(0); setAlreadyOptimal(false); }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '11px 16px', borderRadius: '8px', background: 'none', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', fontSize: '13px' }}>
+              <button onClick={() => { setOriginal(null); setCompressed(null); setQuality(80); setFormat('image/jpeg'); setProgress(0); setAlreadyOptimal(false); imgRef.current = null; fileStore.current = null; }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '11px 16px', borderRadius: '8px', background: 'none', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer', fontSize: '13px' }}>
                 <Icons.Trash size={14} color="currentColor" />New Image
               </button>
             </div>
