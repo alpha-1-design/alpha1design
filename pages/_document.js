@@ -31,6 +31,18 @@ export default function Document() {
         <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
       </Head>
       <body>
+        {/* Alpha Analytics Tracker */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            var SITE_ID = "ab8304c6";
+            var API_URL = "https://alpha-analytics-api.onrender.com";
+            if(navigator.doNotTrack==="1")return;
+            function pv(){fetch(API_URL+"/track/pageview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({site_id:SITE_ID,path:location.pathname,referrer:document.referrer||null}),keepalive:true}).catch(function(){});}
+            pv();
+            var _ps=history.pushState;history.pushState=function(){_ps.apply(this,arguments);pv();};
+            window.addEventListener("popstate",pv);
+          })();
+        `}} />
         <Main />
         <NextScript />
       </body>
