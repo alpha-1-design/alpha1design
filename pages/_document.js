@@ -35,7 +35,7 @@ export default function Document() {
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){
             var SITE_ID = "ab8304c6";
-            var API_URL = "https://alpha-analytics-api.onrender.com";
+            var API_URL = "https://alpha-analytics-api-production-b795.up.railway.app";
             if(navigator.doNotTrack==="1")return;
             function pv(){fetch(API_URL+"/track/pageview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({site_id:SITE_ID,path:location.pathname,referrer:document.referrer||null}),keepalive:true}).catch(function(){});}
             pv();
