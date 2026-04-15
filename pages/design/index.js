@@ -88,6 +88,12 @@ const [base, setBase]     = useState('#6366f1');
     setCopied(exportFormat); setTimeout(()=>setCopied(null),2000);
   };
 
+  const exportCSS = () => {
+    const css = `:root {\n${palette.map((c,i)=>`  --color-${i+1}: ${c};`).join('\n')}\n}`;
+    navigator.clipboard.writeText(css);
+    setCopied('css'); setTimeout(()=>setCopied(null),2000);
+  };
+
   const savePalette = () => {
     if (!saveName.trim()) return;
     const entry = { name: saveName.trim(), colors: [...palette], base, mode, ts: Date.now() };
