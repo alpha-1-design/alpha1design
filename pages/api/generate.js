@@ -6,15 +6,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { prompt, tone, type } = req.body;
+  const { prompt, tone, type, stream } = req.body;
 
   if (!prompt || prompt.trim().length === 0) {
     return res.status(400).json({ error: 'Prompt is required' });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  let apiKey = req.body.apiKey || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'API key not configured. Add ANTHROPIC_API_KEY to your environment variables.' });
+    return res.status(500).json({ error: 'Claude API key required. Add your key in settings.' });
   }
 
   const systemPrompt = buildSystemPrompt(type, tone);

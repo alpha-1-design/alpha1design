@@ -46,14 +46,15 @@ function generatePalette(baseHex, mode) {
 const SAVED_KEY = 'a1d-palettes';
 
 export default function ColorPalette() {
-  const [base, setBase]     = useState('#6366f1');
+const [base, setBase]     = useState('#6366f1');
   const [mode, setMode]     = useState('analogous');
-  const [palette, setPalette] = useState(() => generatePalette('#6366f1', 'analogous'));
-  const [locked, setLocked] = useState([false,false,false,false,false]);
-  const [copied, setCopied] = useState(null);
+  const [palette, setPalette] = useState([]);
+  const [locked, setLocked] = useState([false, false, false, false, false]);
+  const [copied, setCopied]   = useState(null);
   const [saved, setSaved]   = useState([]);
   const [showSaved, setShowSaved] = useState(false);
   const [saveName, setSaveName]   = useState('');
+  const [exportFormat, setExportFormat] = useState('css');
   const [namingMode, setNamingMode] = useState(false);
 
   useEffect(() => {
@@ -73,10 +74,18 @@ export default function ColorPalette() {
   const toggleLock = (i) => setLocked(prev => { const n=[...prev]; n[i]=!n[i]; return n; });
   const copyHex = (hex, id) => { navigator.clipboard.writeText(hex); setCopied(id); setTimeout(()=>setCopied(null),1500); };
 
-  const exportCSS = () => {
-    const css = `:root {\n${palette.map((c,i)=>`  --color-${i+1}: ${c};`).join('\n')}\n}`;
-    navigator.clipboard.writeText(css);
-    setCopied('css'); setTimeout(()=>setCopied(null),2000);
+  const exportFormats = {
+    css: () => `:root {\n${palette.map((c,i)=>`  --color-${i+1}: ${c};`).join('\n')}\n}`,
+    scss: () => palette.map((c,i)=>`$color-${i+1}: ${c};`).join('\n'),
+    json: () => JSON.stringify(palette, null, 2),
+    tailwind: () => `module.exports = {\n  theme: {\n    extend: {\n      colors: {\n${palette.map((c,i)=>`        'brand-${i+1}': '${c}',`).join('\n')}\n      }\n    }\n  }\n}`,
+    tailwind3: () => `colors: {\n${palette.map((c,i)=>`  'brand-${i+1}': '${c}',`).join('\n')}\n}`,
+  };
+
+  const handleExport = () => {
+    const content = exportFormats[exportFormat]?.() || exportFormats.css();
+    navigator.clipboard.writeText(content);
+    setCopied(exportFormat); setTimeout(()=>setCopied(null),2000);
   };
 
   const savePalette = () => {
@@ -206,10 +215,15 @@ export default function ColorPalette() {
           <button onClick={() => regenerate(base, mode)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
             <Icons.Refresh size={15} color="currentColor" />Regenerate
           </button>
-          <button onClick={exportCSS} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', background: copied==='css' ? 'var(--surface2)' : 'var(--surface)', color: copied==='css' ? 'var(--clr)' : 'var(--muted)', border: `1px solid ${copied==='css' ? 'var(--border2)' : 'var(--border)'}`, fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
-            {copied==='css' ? <Icons.Check size={15} color="currentColor" /> : <Icons.Export size={15} color="currentColor" />}
-            {copied==='css' ? 'Copied!' : 'Export CSS'}
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button onClick={handleExport} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', background: copied === exportFormat ? 'var(--surface2)' : 'var(--surface)', color: copied === exportFormat ? 'var(--clr)' : 'var(--muted)', border: `1px solid ${copied === exportFormat ? 'var(--border2)' : 'var(--border)'}`, fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
+              {copied === exportFormat ? <Icons.Check size={15} color="currentColor" /> : <Icons.Export size={15} color="currentColor" />}
+              {copied === exportFormat ? 'Copied!' : `Export ${exportFormat.toUpperCase()}`}
+            </button>
+            <button onClick={() => setExportFormat(f => f === 'css' ? 'json' : f === 'json' ? 'scss' : f === 'scss' ? 'tailwind' : 'css')} style={{ padding: '10px 12px', borderRadius: '8px', background: 'var(--surface)', color: 'var(--muted2)', border: '1px solid var(--border)', fontSize: '11px', fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>
+              ↻
+            </button>
+          </div>
           {!namingMode
             ? <button onClick={() => setNamingMode(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 21H5C3.9 21 3 20.1 3 19V5C3 3.9 3.9 3 5 3H16L21 8V19C21 20.1 20.1 21 19 21Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M17 21V13H7V21M7 3V8H15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>

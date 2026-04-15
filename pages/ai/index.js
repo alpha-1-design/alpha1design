@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 import Icons from '../../components/Icons';
 import useShortcut from '../../lib/useShortcut';
+import ApiKeyManager from '../../components/ApiKeyManager';
 
 const TYPES = [
   { id: 'blog',  label: 'Blog Post' },
@@ -53,9 +54,9 @@ const MODELS = [
     sub:      'Google',
     color:    '#4285f4',
     endpoint: '/api/gemini',
-    keyName:  'GEMINI_API_KEY',
+    keyName:  'gemini_api_key',
     getKey:   'aistudio.google.com',
-    free:     true,
+    free:     false,
     icon: ({ size = 16 }) => (
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
         <path d="M12 2C12 2 7.5 8.5 7.5 12C7.5 15.5 12 22 12 22C12 22 16.5 15.5 16.5 12C16.5 8.5 12 2 12 2Z" fill="#4285f4"/>
@@ -86,9 +87,9 @@ const MODELS = [
     sub:      'Small',
     color:    '#ff7000',
     endpoint: '/api/mistral',
-    keyName:  'MISTRAL_API_KEY',
+    keyName:  'mistral_api_key',
     getKey:   'console.mistral.ai',
-    free:     true,
+    free:     false,
     icon: ({ size = 16, color = 'currentColor' }) => (
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
         <rect x="2"  y="4"  width="5" height="5" fill={color}/>
@@ -127,6 +128,8 @@ export default function AIWriter() {
   const [showHistory, setShowHistory] = useState(false);
   const [modelId, setModelId] = useState('claude');
   const [usedModelId, setUsedModelId] = useState(null);
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [pendingModel, setPendingModel] = useState(null);
 
   useEffect(() => {
     try {
@@ -155,26 +158,58 @@ export default function AIWriter() {
     try { localStorage.setItem(MODEL_KEY, id); } catch {}
   };
 
-  const handleGenerate = useCallback(async () => {
+  const getApiKey = (modelId) => {
+    const keyMap = { claude: 'a1d-claude-key', gemini: 'a1d-gemini-key', mistral: 'a1d-mistral-key' };
+    return typeof window !== 'undefined' ? localStorage.getItem(keyMap[modelId] || '') : null;
+  };
+
+  const checkKeyAndGenerate = async () => {
     if (!prompt.trim() || loading) return;
+    if (!activeModel.free && !getApiKey(activeModel.id)) {
+      setShowKeyModal(true);
+      setPendingModel(activeModel.id);
+      return;
+    }
     setLoading(true); setError(''); setResult(''); setUsedModelId(null);
     try {
-      const res  = await fetch(activeModel.endpoint, {
+      const payload = { prompt, type, tone, stream: true };
+      if (!activeModel.free) payload.apiKey = getApiKey(activeModel.id);
+      const res = await fetch(activeModel.endpoint, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ prompt, type, tone }),
+        body:    JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Generation failed');
-      setResult(data.result);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Generation failed');
+      }
       setUsedModelId(activeModel.id);
-      saveToHistory(prompt, data.result, type, tone, activeModel.id);
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          fullText += chunk;
+          setResult(fullText);
+        }
+      } else {
+        const data = await res.json();
+        fullText = data.result || '';
+        setResult(fullText);
+        saveToHistory(prompt, fullText, type, tone, activeModel.id);
+      }
+      if (fullText) saveToHistory(prompt, fullText, type, tone, activeModel.id);
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [prompt, type, tone, activeModel, loading, saveToHistory]);
+  };
+
+  const handleGenerate = useCallback(checkKeyAndGenerate, [prompt, type, tone, activeModel, loading, saveToHistory]);
 
   const handleCopy = () => {
     if (!result) return;
@@ -541,6 +576,13 @@ export default function AIWriter() {
           </div>
         )}
       </main>
+
+      {showKeyModal && (
+        <ApiKeyManager
+          autoOpenFor={pendingModel}
+          onClose={() => { setShowKeyModal(false); setPendingModel(null); }}
+        />
+      )}
       <Footer />
     </div>
   );

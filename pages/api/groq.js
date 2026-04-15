@@ -4,15 +4,65 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { prompt, tone, type } = req.body;
+  const { prompt, tone, type, stream } = req.body;
   if (!prompt?.trim()) return res.status(400).json({ error: 'Prompt is required' });
 
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'Groq API key not configured. Add GROQ_API_KEY to your environment variables.' });
+  let apiKey = req.body.apiKey || process.env.GROQ_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Groq API key required. Add your key in settings or set GROQ_API_KEY env var.' });
 
   const systemPrompt = buildSystemPrompt(type, tone);
 
   try {
+    if (stream) {
+      res.setHeader('Content-Type', 'text/plain');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          max_tokens: 1024,
+          temperature: 0.85,
+          stream: true,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user',   content: prompt },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        return res.status(response.status).json({ error: err.error?.message || 'Groq API error' });
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+        for (const line of lines) {
+          const data = line.slice(6);
+          if (data === '[DONE]') continue;
+          try {
+            const json = JSON.parse(data);
+            const text = json.choices?.[0]?.delta?.content || '';
+            if (text) res.write(text);
+          } catch {}
+        }
+      }
+      res.end();
+      return;
+    }
+
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {

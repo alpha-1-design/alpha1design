@@ -12,9 +12,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Prompt is required' });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  let apiKey = req.body.apiKey || process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'Gemini API key not configured. Add GEMINI_API_KEY to your environment variables.' });
+    return res.status(500).json({ error: 'Gemini API key required. Add your key in settings.' });
   }
 
   const systemPrompt = buildSystemPrompt(type, tone);

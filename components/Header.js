@@ -3,12 +3,20 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Icons from './Icons';
 import ThemeSwitcher from './ThemeSwitcher';
+import ApiKeyManager from './ApiKeyManager';
 
-export default function Header() {
+export default function Header({ onAction }) {
   const router = useRouter();
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstall, setShowInstall] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showKeyModal, setShowKeyModal] = useState(false);
+
+  useEffect(() => {
+    const handler = (e) => { if (e.detail === 'api-keys') setShowKeyModal(true); };
+    window.addEventListener('header-action', handler);
+    return () => window.removeEventListener('header-action', handler);
+  }, []);
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); setShowInstall(true); };
@@ -61,6 +69,12 @@ export default function Header() {
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button onClick={() => setShowKeyModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border2)', cursor: 'pointer' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <path d="M21 2L19 4M11.39 2.61a1.167 1.167 0 011.22 0l3.96 2.28 3.96 2.28a1.167 1.167 0 010 2.08l-2.28 3.96-2.28 3.96a1.167 1.167 0 01-2.08 0l-3.96-2.28-3.96-2.28a1.167 1.167 0 010-2.08l2.28-3.96 2.28-3.96a1.167 1.167 0 012.08 0z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Keys
+          </button>
           <ThemeSwitcher />
           {showInstall && (
             <button onClick={handleInstall} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', background: 'var(--surface2)', color: accent, border: '1px solid var(--border2)', cursor: 'pointer' }}>
@@ -89,6 +103,8 @@ export default function Header() {
         </div>
       )}
       <style>{`@media (max-width: 768px) { .desktop-nav { display: none !important; } .mobile-menu-btn { display: flex !important; } }`}</style>
+
+      {showKeyModal && <ApiKeyManager onClose={() => setShowKeyModal(false)} />}
     </>
   );
 }

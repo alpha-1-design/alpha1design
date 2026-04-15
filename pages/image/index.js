@@ -5,6 +5,42 @@ import Footer from '../../components/Footer';
 import Icons from '../../components/Icons';
 import useShortcut from '../../lib/useShortcut';
 
+function BeforeAfterSlider({ before, after, onClose }) {
+  const [pos, setPos] = useState(50);
+  const containerRef = useRef(null);
+  const isDragging = useRef(false);
+
+  const handleMove = useCallback((e) => {
+    if (!isDragging.current || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = ((e.clientX || e.touches?.[0]?.clientX) - rect.left);
+    setPos(Math.max(0, Math.min(100, (x / rect.width) * 100)));
+  }, []);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 900, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={onClose}>
+      <div style={{ maxWidth: '900px', width: '100%' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <span style={{ fontWeight: '700', fontSize: '16px', color: 'var(--text)' }}>Compare Before / After</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}><Icons.X size={20} color="var(--muted)" /></button>
+        </div>
+        <div ref={containerRef} onMouseMove={handleMove} onMouseUp={() => isDragging.current = false} onMouseLeave={() => isDragging.current = false} onTouchMove={handleMove} onTouchEnd={() => isDragging.current = false} style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', cursor: 'ew-resize', aspectRatio: '16/9', maxHeight: '70vh' }}>
+          <img src={after} alt="After" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: 'var(--surface2)' }} />
+          <img src={before} alt="Before" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', clipPath: `inset(0 ${100 - pos}% 0 0)` }} />
+          <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${pos}%`, width: '2px', background: '#fff', boxShadow: '0 0 8px rgba(0,0,0,0.5)' }}>
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '36px', height: '36px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icons.ChevronLeft size={14} color="#000" /><Icons.ChevronRight size={14} color="#000" />
+            </div>
+          </div>
+          <span style={{ position: 'absolute', bottom: '12px', left: '12px', fontSize: '11px', fontFamily: 'var(--font-mono)', padding: '4px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff' }}>Before</span>
+          <span style={{ position: 'absolute', bottom: '12px', right: '12px', fontSize: '11px', fontFamily: 'var(--font-mono)', padding: '4px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff' }}>After</span>
+        </div>
+        <p style={{ textAlign: 'center', marginTop: '12px', fontSize: '12px', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>Drag to compare · Click to close</p>
+      </div>
+    </div>
+  );
+}
+
 function formatBytes(bytes) {
   if (!bytes || bytes === 0) return '0 B';
   const k = 1024, sizes = ['B', 'KB', 'MB'];
@@ -27,6 +63,7 @@ export default function ImageCompressor() {
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress]     = useState(0);
   const [alreadyOptimal, setAlreadyOptimal] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
   const fileRef   = useRef();
   const imgRef    = useRef();
   const fileStore = useRef();
@@ -220,6 +257,12 @@ export default function ImageCompressor() {
               ))}
             </div>
 
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+              <button onClick={() => setShowCompare(true)} disabled={!compressed || processing} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', background: compressed && !processing ? 'var(--surface2)' : 'var(--surface)', color: compressed && !processing ? 'var(--text)' : 'var(--muted)', border: '1px solid var(--border)', cursor: compressed && !processing ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: '600' }}>
+                <Icons.Split size={14} color="currentColor" />Compare
+              </button>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
               {[
                 { label: 'Original', src: original.src, size: original.size },
@@ -254,6 +297,8 @@ export default function ImageCompressor() {
           </>
         )}
       </main>
+
+      {showCompare && <BeforeAfterSlider before={original.src} after={compressed?.src || original.src} onClose={() => setShowCompare(false)} />}
       <Footer />
     </div>
   );

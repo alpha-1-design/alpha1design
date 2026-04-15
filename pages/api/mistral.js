@@ -7,8 +7,8 @@ export default async function handler(req, res) {
   const { prompt, tone, type } = req.body;
   if (!prompt?.trim()) return res.status(400).json({ error: 'Prompt is required' });
 
-  const apiKey = process.env.MISTRAL_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'Mistral API key not configured. Add MISTRAL_API_KEY to your environment variables.' });
+  let apiKey = req.body.apiKey || process.env.MISTRAL_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Mistral API key required. Add your key in settings.' });
 
   const systemPrompt = buildSystemPrompt(type, tone);
 
