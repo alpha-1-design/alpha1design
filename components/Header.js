@@ -11,6 +11,16 @@ export default function Header({ onAction }) {
   const [showInstall, setShowInstall] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    setIsOnline(typeof navigator !== 'undefined' ? navigator.onLine : true);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
+  }, []);
 
   useEffect(() => {
     const handler = (e) => { if (e.detail === 'api-keys') setShowKeyModal(true); };
@@ -69,6 +79,11 @@ export default function Header({ onAction }) {
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {!isOnline && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b' }} />Offline
+            </div>
+          )}
           <button onClick={() => setShowKeyModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', background: 'var(--surface2)', color: 'var(--muted)', border: '1px solid var(--border2)', cursor: 'pointer' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
               <path d="M21 2L19 4M11.39 2.61a1.167 1.167 0 011.22 0l3.96 2.28 3.96 2.28a1.167 1.167 0 010 2.08l-2.28 3.96-2.28 3.96a1.167 1.167 0 01-2.08 0l-3.96-2.28-3.96-2.28a1.167 1.167 0 010-2.08l2.28-3.96 2.28-3.96a1.167 1.167 0 012.08 0z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>

@@ -132,6 +132,7 @@ export default function ImageCompressor() {
           name: file.name,
           w:    img.naturalWidth,
           h:    img.naturalHeight,
+          type: file.type,
         });
         compressFromImg(img, file.size, quality, format);
       };
@@ -257,6 +258,13 @@ export default function ImageCompressor() {
               ))}
             </div>
 
+            <div style={{ marginBottom: '20px', padding: '12px 14px', background: 'var(--surface2)', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', gap: '20px', flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+              <div><span style={{ color: 'var(--muted)' }}>Filename:</span> <span style={{ color: 'var(--text)' }}>{original?.name || '—'}</span></div>
+              <div><span style={{ color: 'var(--muted)' }}>Dimensions:</span> <span style={{ color: 'var(--text)' }}>{original?.w && original?.h ? `${original.w}×${original.h}` : '—'}</span></div>
+              <div><span style={{ color: 'var(--muted)' }}>Size:</span> <span style={{ color: 'var(--text)' }}>{original?.size ? formatBytes(original.size) : '—'}</span></div>
+              <div><span style={{ color: 'var(--muted)' }}>Type:</span> <span style={{ color: 'var(--text)' }}>{original?.type || '—'}</span></div>
+            </div>
+
             <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
               <button onClick={() => setShowCompare(true)} disabled={!compressed || processing} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', background: compressed && !processing ? 'var(--surface2)' : 'var(--surface)', color: compressed && !processing ? 'var(--text)' : 'var(--muted)', border: '1px solid var(--border)', cursor: compressed && !processing ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: '600' }}>
                 <Icons.Split size={14} color="currentColor" />Compare
@@ -283,6 +291,13 @@ export default function ImageCompressor() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div style={{ marginBottom: '20px', padding: '12px 14px', background: 'var(--surface2)', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', gap: '20px', flexWrap: 'wrap', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+              <div><span style={{ color: 'var(--muted)' }}>Filename:</span> <span style={{ color: 'var(--text)' }}>{original?.name || '—'}</span></div>
+              <div><span style={{ color: 'var(--muted)' }}>Dimensions:</span> <span style={{ color: 'var(--text)' }}>{original?.w && original?.h ? `${original.w}×${original.h}` : '—'}</span></div>
+              <div><span style={{ color: 'var(--muted)' }}>Size:</span> <span style={{ color: 'var(--text)' }}>{original?.size ? formatBytes(original.size) : '—'}</span></div>
+              <div><span style={{ color: 'var(--muted)' }}>Type:</span> <span style={{ color: 'var(--text)' }}>{original?.type || '—'}</span></div>
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>

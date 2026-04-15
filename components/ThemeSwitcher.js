@@ -1,6 +1,7 @@
 import { useTheme, THEMES } from '../lib/ThemeContext';
 
 const icons = {
+  system:   '◎',
   dark:     '◑',
   midnight: '◉',
   light:    '○',

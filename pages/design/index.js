@@ -23,6 +23,7 @@ function hexToHsl(hex) {
 }
 function randomHex() { return hslToHex(Math.floor(Math.random()*360), 55+Math.floor(Math.random()*30), 35+Math.floor(Math.random()*30)); }
 function luminance(hex) { const r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255; return 0.299*r+0.587*g+0.114*b; }
+function getContrastRatio(hex1, hex2) { const l1 = luminance(hex1), l2 = luminance(hex2); const lighter = Math.max(l1, l2), darker = Math.min(l1, l2); return (lighter + 0.05) / (darker + 0.05); }
 
 const MODES = [
   { id: 'analogous',            label: 'Analogous'       },
@@ -30,11 +31,21 @@ const MODES = [
   { id: 'triadic',              label: 'Triadic'         },
   { id: 'split-complementary',  label: 'Split Comp.'     },
   { id: 'tetradic',             label: 'Tetradic'        },
+  { id: 'monochromatic',        label: 'Grayscale'      },
 ];
 
 function generatePalette(baseHex, mode) {
   const [h, s, l] = hexToHsl(baseHex);
   const offsets = { analogous:[0,30,-30,60,-60], complementary:[0,180,30,210,-30], triadic:[0,120,240,60,300], 'split-complementary':[0,150,210,75,285], tetradic:[0,90,180,270,45] };
+  if (mode === 'monochromatic') {
+    const steps = [-40, -20, 0, 20, 40];
+    return steps.map(step => {
+      const newLum = Math.min(230, Math.max(25, luminance(baseHex) * 255 + step * 2.55));
+      const gray = Math.round(newLum);
+      const hex = gray.toString(16).padStart(2, '0');
+      return `#${hex}${hex}${hex}`;
+    });
+  }
   return (offsets[mode] || offsets.analogous).map((offset, i) => {
     const newH = ((h + offset) % 360 + 360) % 360;
     const newS = Math.min(100, Math.max(20, s + (i%2===0?0:5)));
@@ -56,6 +67,7 @@ const [base, setBase]     = useState('#6366f1');
   const [saveName, setSaveName]   = useState('');
   const [exportFormat, setExportFormat] = useState('css');
   const [namingMode, setNamingMode] = useState(false);
+  const [showContrast, setShowContrast] = useState(false);
 
   useEffect(() => {
     try { const s = JSON.parse(localStorage.getItem(SAVED_KEY) || '[]'); setSaved(s); } catch {}
@@ -133,7 +145,7 @@ const [base, setBase]     = useState('#6366f1');
             </div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(28px, 5vw, 52px)', letterSpacing: '0.04em', lineHeight: 1 }}>PALETTE GENERATOR</h1>
             <p style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '12px', marginTop: '6px' }}>
-              5 harmony modes · lock colors · export CSS ·&nbsp;
+              6 harmony modes · lock colors · export CSS ·&nbsp;
               <kbd style={{ background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: '4px', padding: '1px 5px', fontSize: '11px' }}>⌘R</kbd> randomize ·&nbsp;
               <kbd style={{ background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: '4px', padding: '1px 5px', fontSize: '11px' }}>⌘S</kbd> save
             </p>
@@ -250,6 +262,10 @@ const [base, setBase]     = useState('#6366f1');
                 </button>
               </div>
           }
+          <button onClick={() => setShowContrast(!showContrast)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', background: showContrast ? 'var(--surface2)' : 'var(--surface)', color: showContrast ? 'var(--clr)' : 'var(--muted)', border: `1px solid ${showContrast ? 'var(--border2)' : 'var(--border)'}`, fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" fill="currentColor" opacity="0.3"/><path d="M12 6v2m0 8v2m4-6h2M4 12H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            Contrast
+          </button>
         </div>
 
         {/* Palette swatches */}
@@ -274,6 +290,65 @@ const [base, setBase]     = useState('#6366f1');
             </div>
           ))}
         </div>
+
+        {/* Contrast Checker */}
+        {showContrast && palette.length > 0 && (
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden', marginBottom: '24px' }}>
+            <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span className="label" style={{ color: 'var(--clr)' }}>WCAG Contrast Ratios</span>
+              <div style={{ display: 'flex', gap: '12px', fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
+                <span style={{ color: '#22c55e' }}>AAA ≥7:1</span>
+                <span style={{ color: '#eab308' }}>AA ≥4.5:1</span>
+                <span style={{ color: '#ef4444' }}>Fail &lt;4.5:1</span>
+              </div>
+            </div>
+            <div style={{ padding: '16px', overflowX: 'auto' }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '8px', textAlign: 'center', color: 'var(--muted)', fontWeight: '600', borderBottom: '1px solid var(--border)' }}></th>
+                    {palette.map((c, i) => (
+                      <th key={i} style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: c, margin: '0 auto 4px', border: '1px solid var(--border)' }} />
+                        <div style={{ color: 'var(--text)', fontSize: '10px' }}>{c.toUpperCase()}</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {palette.map((rowColor, i) => (
+                    <tr key={i}>
+                      <td style={{ padding: '8px', textAlign: 'center', borderBottom: i < palette.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: rowColor, margin: '0 auto 4px', border: '1px solid var(--border)' }} />
+                        <div style={{ color: 'var(--text)', fontSize: '10px' }}>{rowColor.toUpperCase()}</div>
+                      </td>
+                      {palette.map((colColor, j) => {
+                        if (i === j) {
+                          return (
+                            <td key={j} style={{ padding: '8px', textAlign: 'center', borderBottom: i < palette.length - 1 ? '1px solid var(--border)' : 'none', background: 'var(--surface2)' }}>
+                              <span style={{ color: 'var(--muted2)' }}>—</span>
+                            </td>
+                          );
+                        }
+                        const ratio = getContrastRatio(rowColor, colColor);
+                        const passAAA = ratio >= 7;
+                        const passAA = ratio >= 4.5;
+                        const color = passAAA ? '#22c55e' : passAA ? '#eab308' : '#ef4444';
+                        const badge = passAAA ? 'AAA' : passAA ? 'AA' : 'Fail';
+                        return (
+                          <td key={j} style={{ padding: '8px', textAlign: 'center', borderBottom: i < palette.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                            <div style={{ color, fontWeight: '700', marginBottom: '2px' }}>{ratio.toFixed(2)}:1</div>
+                            <span style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '4px', background: color + '20', color, fontWeight: '700' }}>{badge}</span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* CSS Preview */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
