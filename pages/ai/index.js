@@ -24,11 +24,16 @@ const TONES = [
 ];
 
 const TEMPLATES = [
-  { label: 'Product Launch',    prompt: 'Write a product launch announcement for Alpha-1 Design, a new AI-powered creative studio PWA.' },
-  { label: 'Cold Email',        prompt: 'Write a cold outreach email to a potential client who runs a SaaS startup needing design help.' },
-  { label: 'Twitter Thread',    prompt: 'Write a 5-tweet thread about why every developer should learn design fundamentals.' },
-  { label: 'Landing Page Hero', prompt: 'Write a landing page headline, subheadline, and CTA for a premium design studio app.' },
-  { label: 'React Hook',        prompt: 'Write a custom React hook called useDebounce that debounces a value by a given delay. Include TypeScript types and usage example.' },
+  { label: 'Creative Story',      prompt: 'Write a creative story about ' },
+  { label: 'Explain Simply',     prompt: 'Explain [topic] to a 5-year-old' },
+  { label: 'Professional Email',  prompt: 'Write a professional email about ' },
+  { label: 'Product Description', prompt: 'Create a product description for ' },
+  { label: 'Social Media Post',  prompt: 'Write a social media post about ' },
+  { label: 'Product Launch',     prompt: 'Write a product launch announcement for Alpha-1 Design, a new AI-powered creative studio PWA.' },
+  { label: 'Cold Email',         prompt: 'Write a cold outreach email to a potential client who runs a SaaS startup needing design help.' },
+  { label: 'Twitter Thread',     prompt: 'Write a 5-tweet thread about why every developer should learn design fundamentals.' },
+  { label: 'Landing Page Hero',  prompt: 'Write a landing page headline, subheadline, and CTA for a premium design studio app.' },
+  { label: 'React Hook',         prompt: 'Write a custom React hook called useDebounce that debounces a value by a given delay. Include TypeScript types and usage example.' },
 ];
 
 // ── Model definitions ────────────────────────────────────────────────────────
@@ -251,7 +256,14 @@ export default function AIWriter() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Head><title>AI Writer — Alpha-1 Design</title></Head>
+      <Head>
+        <title>AI Writer — Alpha-1 Design</title>
+        <meta name="description" content="Generate content with Claude, Gemini, Groq, or Mistral AI models. Choose content types (blog, email, tweet, code, ad), control tone, use templates, and track history." />
+        <meta property="og:title" content="AI Writer — Alpha-1 Design" />
+        <meta property="og:description" content="Generate content with Claude, Gemini, Groq, or Mistral AI models. Choose content types, control tone, use templates, and track history." />
+        <meta property="og:image" content="/og-ai.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Head>
       <Header />
       <div style={{ height: '2px', background: `linear-gradient(90deg, ${activeModel.color}, transparent)` }} />
 

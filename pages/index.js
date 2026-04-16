@@ -15,7 +15,14 @@ const tools = [
 export default function Home() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Head><title>Alpha-1 Design — Creative Studio</title></Head>
+      <Head>
+        <title>Alpha-1 Design — Creative Studio</title>
+        <meta name="description" content="A premium studio of AI and design tools for creators, designers, and developers. Generate content with AI, compress images, create color palettes, and pair fonts. Install as an app. Works offline." />
+        <meta property="og:title" content="Alpha-1 Design — Creative Studio" />
+        <meta property="og:description" content="A premium studio of AI and design tools for creators, designers, and developers. Generate content with AI, compress images, create color palettes, and pair fonts. Works offline." />
+        <meta property="og:image" content="/og-image.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Head>
       <Header />
       <main style={{ flex: 1, padding: '0 24px' }}>
         <section style={{ maxWidth: '900px', margin: '0 auto', padding: '80px 0 60px', textAlign: 'center' }}>

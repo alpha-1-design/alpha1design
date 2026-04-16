@@ -54,6 +54,15 @@ const FORMATS = [
   { id: 'image/webp', label: 'WebP', ext: 'webp' },
 ];
 
+const RESIZE_PRESETS = [
+  { label: 'Original',  w: null, h: null },
+  { label: '1920×1080', w: 1920, h: 1080 },
+  { label: '1280×720',  w: 1280, h: 720 },
+  { label: '800×600',   w: 800,  h: 600 },
+  { label: '640×480',   w: 640,  h: 480 },
+  { label: '320×240',   w: 320,  h: 240 },
+];
+
 export default function ImageCompressor() {
   const [original, setOriginal]     = useState(null);
   const [compressed, setCompressed] = useState(null);
@@ -63,13 +72,14 @@ export default function ImageCompressor() {
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress]     = useState(0);
   const [alreadyOptimal, setAlreadyOptimal] = useState(false);
-  const [showCompare, setShowCompare] = useState(false);
+  const [showCompare, setShowCompare]       = useState(false);
+  const [resizePreset, setResizePreset]     = useState(0);
   const fileRef   = useRef();
   const imgRef    = useRef();
   const fileStore = useRef();
 
   // Compress from already-loaded image element — no second FileReader
-  const compressFromImg = useCallback((img, originalSize, q, fmt) => {
+  const compressFromImg = useCallback((img, originalSize, q, fmt, resize = null) => {
     setProcessing(true);
     setProgress(0);
     setAlreadyOptimal(false);
@@ -86,14 +96,33 @@ export default function ImageCompressor() {
     setTimeout(() => {
       try {
         const canvas = document.createElement('canvas');
-        canvas.width  = img.naturalWidth  || img.width;
-        canvas.height = img.naturalHeight || img.height;
+        const srcW = img.naturalWidth  || img.width;
+        const srcH = img.naturalHeight || img.height;
+        
+        let dstW, dstH;
+        if (resize && resize.w && resize.h) {
+          const srcRatio = srcW / srcH;
+          const dstRatio = resize.w / resize.h;
+          if (srcRatio > dstRatio) {
+            dstW = resize.w;
+            dstH = Math.round(resize.w / srcRatio);
+          } else {
+            dstH = resize.h;
+            dstW = Math.round(resize.h * srcRatio);
+          }
+        } else {
+          dstW = srcW;
+          dstH = srcH;
+        }
+        
+        canvas.width  = dstW;
+        canvas.height = dstH;
         const ctx = canvas.getContext('2d');
         if (fmt === 'image/jpeg') {
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(img, 0, 0, dstW, dstH);
         const useQuality = fmt === 'image/png' ? undefined : q / 100;
         canvas.toBlob((blob) => {
           clearInterval(interval);
@@ -134,21 +163,24 @@ export default function ImageCompressor() {
           h:    img.naturalHeight,
           type: file.type,
         });
-        compressFromImg(img, file.size, quality, format);
+        const preset = RESIZE_PRESETS[resizePreset];
+        compressFromImg(img, file.size, quality, format, { w: preset.w, h: preset.h });
       };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
-  }, [quality, format, compressFromImg]);
+  }, [quality, format, compressFromImg, resizePreset]);
 
   const recompress = useCallback((q, fmt) => {
     if (imgRef.current && fileStore.current) {
-      compressFromImg(imgRef.current, fileStore.current.size, q, fmt);
+      const preset = RESIZE_PRESETS[resizePreset];
+      compressFromImg(imgRef.current, fileStore.current.size, q, fmt, { w: preset.w, h: preset.h });
     }
-  }, [compressFromImg]);
+  }, [compressFromImg, resizePreset]);
 
   const handleQualityChange = (e) => { const q = parseInt(e.target.value); setQuality(q); recompress(q, format); };
   const handleFormatChange  = (f)  => { setFormat(f); recompress(quality, f); };
+  const handleResizeChange = (idx) => { setResizePreset(idx); const preset = RESIZE_PRESETS[idx]; recompress(quality, format); };
   const handleDrop = (e) => { e.preventDefault(); setDragging(false); processFile(e.dataTransfer.files?.[0]); };
 
   const handleDownload = () => {
@@ -171,7 +203,14 @@ export default function ImageCompressor() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Head><title>Image Compressor — Alpha-1 Design</title></Head>
+      <Head>
+        <title>Image Compressor — Alpha-1 Design</title>
+        <meta name="description" content="Compress images instantly with client-side processing. Quality slider, format conversion (JPG, PNG, WebP), before/after comparison, and resize presets. 100% private." />
+        <meta property="og:title" content="Image Compressor — Alpha-1 Design" />
+        <meta property="og:description" content="Compress images instantly with client-side processing. Quality slider, format conversion, before/after comparison, and resize presets. 100% private." />
+        <meta property="og:image" content="/og-image-tool.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Head>
       <Header />
       <div style={{ height: '2px', background: 'linear-gradient(90deg, var(--img), transparent)' }} />
       <main style={{ flex: 1, maxWidth: '860px', margin: '0 auto', padding: '48px 24px', width: '100%' }}>
@@ -239,6 +278,14 @@ export default function ImageCompressor() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {FORMATS.map((f) => (
                     <button key={f.id} onClick={() => handleFormatChange(f.id)} disabled={processing} style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: '700', cursor: processing ? 'not-allowed' : 'pointer', background: format === f.id ? 'var(--img)' : 'var(--surface2)', color: format === f.id ? '#000' : 'var(--muted)', border: `1px solid ${format === f.id ? 'var(--img)' : 'var(--border)'}`, fontFamily: 'var(--font-mono)', opacity: processing ? 0.5 : 1, transition: 'all var(--transition)' }}>{f.label}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
+                <span className="label" style={{ display: 'block', marginBottom: '12px' }}>Resize</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {RESIZE_PRESETS.map((p, idx) => (
+                    <button key={idx} onClick={() => handleResizeChange(idx)} disabled={processing} style={{ padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: '700', cursor: processing ? 'not-allowed' : 'pointer', background: resizePreset === idx ? 'var(--img)' : 'var(--surface2)', color: resizePreset === idx ? '#000' : 'var(--muted)', border: `1px solid ${resizePreset === idx ? 'var(--img)' : 'var(--border)'}`, fontFamily: 'var(--font-mono)', opacity: processing ? 0.5 : 1, transition: 'all var(--transition)' }}>{p.label}</button>
                   ))}
                 </div>
               </div>

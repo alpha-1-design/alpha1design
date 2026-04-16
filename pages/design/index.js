@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 import Icons from '../../components/Icons';
@@ -25,6 +26,43 @@ function randomHex() { return hslToHex(Math.floor(Math.random()*360), 55+Math.fl
 function luminance(hex) { const r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255; return 0.299*r+0.587*g+0.114*b; }
 function getContrastRatio(hex1, hex2) { const l1 = luminance(hex1), l2 = luminance(hex2); const lighter = Math.max(l1, l2), darker = Math.min(l1, l2); return (lighter + 0.05) / (darker + 0.05); }
 
+function extractColorsFromImage(imageSrc, numColors = 5) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const maxDim = 150;
+      const scale = Math.min(maxDim / img.width, maxDim / img.height, 1);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const pixels = imageData.data;
+      const colorMap = {};
+      for (let i = 0; i < pixels.length; i += 4) {
+        const r = Math.round(pixels[i] / 16) * 16;
+        const g = Math.round(pixels[i + 1] / 16) * 16;
+        const b = Math.round(pixels[i + 2] / 16) * 16;
+        const key = `${r},${g},${b}`;
+        colorMap[key] = (colorMap[key] || 0) + 1;
+      }
+      const sorted = Object.entries(colorMap).sort((a, b) => b[1] - a[1]);
+      const topColors = sorted.slice(0, numColors).map(([key]) => {
+        const [r, g, b] = key.split(',').map(Number);
+        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+      });
+      while (topColors.length < numColors) {
+        topColors.push('#888888');
+      }
+      resolve(topColors);
+    };
+    img.onerror = () => resolve(['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe']);
+    img.src = imageSrc;
+  });
+}
+
 const MODES = [
   { id: 'analogous',            label: 'Analogous'       },
   { id: 'complementary',        label: 'Complementary'   },
@@ -32,6 +70,7 @@ const MODES = [
   { id: 'split-complementary',  label: 'Split Comp.'     },
   { id: 'tetradic',             label: 'Tetradic'        },
   { id: 'monochromatic',        label: 'Grayscale'      },
+  { id: 'gradient',             label: 'Gradient'       },
 ];
 
 function generatePalette(baseHex, mode) {
@@ -68,17 +107,67 @@ const [base, setBase]     = useState('#6366f1');
   const [exportFormat, setExportFormat] = useState('css');
   const [namingMode, setNamingMode] = useState(false);
   const [showContrast, setShowContrast] = useState(false);
+  const [showImageImport, setShowImageImport] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [gradientStart, setGradientStart] = useState('#6366f1');
+  const [gradientEnd, setGradientEnd] = useState('#ec4899');
+  const [linkCopied, setLinkCopied] = useState(false);
+  const fileInputRef = useRef(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const { base: urlBase, mode: urlMode, colors: urlColors } = router.query;
+    if (urlBase && urlColors) {
+      const colors = urlColors.split(',');
+      setBase(decodeURIComponent(urlBase));
+      if (urlMode) setMode(urlMode);
+      setPalette(colors.map(c => decodeURIComponent(c)));
+      setLocked([false, false, false, false, false]);
+    }
+  }, [router.query]);
+
+  const gradientCss = `linear-gradient(135deg, ${gradientStart}, ${gradientEnd})`;
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsExtracting(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const colors = await extractColorsFromImage(evt.target.result, 5);
+      setBase(colors[0]);
+      setPalette(colors);
+      setLocked([false, false, false, false, false]);
+      setIsExtracting(false);
+      setShowImageImport(false);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   useEffect(() => {
     try { const s = JSON.parse(localStorage.getItem(SAVED_KEY) || '[]'); setSaved(s); } catch {}
   }, []);
 
+  useEffect(() => {
+    if (mode === 'gradient') {
+      setPalette([gradientStart, gradientEnd]);
+    } else if (palette.length === 0) {
+      const fresh = generatePalette(base, mode);
+      setPalette(fresh);
+    }
+  }, [mode, gradientStart, gradientEnd]);
+
   const persistSaved = (arr) => { setSaved(arr); try { localStorage.setItem(SAVED_KEY, JSON.stringify(arr)); } catch {} };
 
   const regenerate = useCallback((newBase, newMode, currentLocked = locked, currentPalette = palette) => {
+    if (newMode === 'gradient') {
+      setPalette([gradientStart, gradientEnd]);
+      return;
+    }
     const fresh = generatePalette(newBase || base, newMode || mode);
     setPalette(fresh.map((c, i) => currentLocked[i] ? currentPalette[i] : c));
-  }, [base, mode, locked, palette]);
+  }, [base, mode, locked, palette, gradientStart, gradientEnd]);
 
   const handleBaseChange = (e) => { setBase(e.target.value); regenerate(e.target.value, mode); };
   const handleMode = (m) => { setMode(m); regenerate(base, m); };
@@ -87,11 +176,11 @@ const [base, setBase]     = useState('#6366f1');
   const copyHex = (hex, id) => { navigator.clipboard.writeText(hex); setCopied(id); setTimeout(()=>setCopied(null),1500); };
 
   const exportFormats = {
-    css: () => `:root {\n${palette.map((c,i)=>`  --color-${i+1}: ${c};`).join('\n')}\n}`,
-    scss: () => palette.map((c,i)=>`$color-${i+1}: ${c};`).join('\n'),
-    json: () => JSON.stringify(palette, null, 2),
-    tailwind: () => `module.exports = {\n  theme: {\n    extend: {\n      colors: {\n${palette.map((c,i)=>`        'brand-${i+1}': '${c}',`).join('\n')}\n      }\n    }\n  }\n}`,
-    tailwind3: () => `colors: {\n${palette.map((c,i)=>`  'brand-${i+1}': '${c}',`).join('\n')}\n}`,
+    css: () => mode === 'gradient' ? `background: ${gradientCss};` : `:root {\n${palette.map((c,i)=>`  --color-${i+1}: ${c};`).join('\n')}\n}`,
+    scss: () => mode === 'gradient' ? `$gradient: ${gradientCss};` : palette.map((c,i)=>`$color-${i+1}: ${c};`).join('\n'),
+    json: () => mode === 'gradient' ? JSON.stringify({ gradient: gradientCss }, null, 2) : JSON.stringify(palette, null, 2),
+    tailwind: () => mode === 'gradient' ? `backgroundImage: {\n  'gradient': '${gradientCss}',\n}` : `module.exports = {\n  theme: {\n    extend: {\n      colors: {\n${palette.map((c,i)=>`        'brand-${i+1}': '${c}',`).join('\n')}\n      }\n    }\n  }\n}`,
+    tailwind3: () => mode === 'gradient' ? `backgroundImage: {\n  'gradient': '${gradientCss}',\n}` : `colors: {\n${palette.map((c,i)=>`  'brand-${i+1}': '${c}',`).join('\n')}\n}`,
   };
 
   const handleExport = () => {
@@ -101,7 +190,7 @@ const [base, setBase]     = useState('#6366f1');
   };
 
   const exportCSS = () => {
-    const css = `:root {\n${palette.map((c,i)=>`  --color-${i+1}: ${c};`).join('\n')}\n}`;
+    const css = mode === 'gradient' ? `background: ${gradientCss};` : `:root {\n${palette.map((c,i)=>`  --color-${i+1}: ${c};`).join('\n')}\n}`;
     navigator.clipboard.writeText(css);
     setCopied('css'); setTimeout(()=>setCopied(null),2000);
   };
@@ -121,6 +210,22 @@ const [base, setBase]     = useState('#6366f1');
 
   const deleteSaved = (i) => persistSaved(saved.filter((_, idx) => idx !== i));
 
+  const generateShareUrl = () => {
+    const params = new URLSearchParams({
+      base: base.replace('#', ''),
+      mode,
+      colors: palette.map(c => c.replace('#', '')).join(','),
+    });
+    return `${window.location.origin}/design?${params.toString()}`;
+  };
+
+  const copyShareLink = () => {
+    const url = generateShareUrl();
+    navigator.clipboard.writeText(url);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
   // Shortcuts
   useShortcut([
     { key: 'r', meta: true, action: handleRandomize },
@@ -129,7 +234,14 @@ const [base, setBase]     = useState('#6366f1');
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Head><title>Color Palette — Alpha-1 Design</title></Head>
+      <Head>
+        <title>Color Palette — Alpha-1 Design</title>
+        <meta name="description" content="Generate beautiful, harmonious color palettes with 6 harmony modes. Lock colors, export CSS variables, save collections, and extract colors from images." />
+        <meta property="og:title" content="Color Palette Generator — Alpha-1 Design" />
+        <meta property="og:description" content="Generate beautiful, harmonious color palettes with 6 harmony modes. Lock colors, export CSS variables, save collections, and extract colors from images." />
+        <meta property="og:image" content="/og-design.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Head>
       <Header />
       <div style={{ height: '2px', background: 'linear-gradient(90deg, var(--clr), transparent)' }} />
 
@@ -202,6 +314,7 @@ const [base, setBase]     = useState('#6366f1');
 
         {/* Controls */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '22px', marginBottom: '20px', display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'center' }}>
+          {mode !== 'gradient' && (
           <div>
             <span className="label" style={{ display: 'block', marginBottom: '10px' }}>Base Color</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -209,6 +322,7 @@ const [base, setBase]     = useState('#6366f1');
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--text)', letterSpacing: '0.06em' }}>{base.toUpperCase()}</span>
             </div>
           </div>
+          )}
           <div style={{ flex: 1 }}>
             <span className="label" style={{ display: 'block', marginBottom: '10px' }}>Harmony Mode</span>
             <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
@@ -222,6 +336,21 @@ const [base, setBase]     = useState('#6366f1');
                 }}>{m.label}</button>
               ))}
             </div>
+            {mode === 'gradient' && (
+              <div style={{ marginTop: '12px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>Start</span>
+                  <input type="color" value={gradientStart} onChange={e => setGradientStart(e.target.value)} style={{ width: '32px', height: '32px', borderRadius: '6px', border: '1px solid var(--border2)', cursor: 'pointer', padding: '2px', background: 'none' }} />
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)' }}>{gradientStart.toUpperCase()}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>End</span>
+                  <input type="color" value={gradientEnd} onChange={e => setGradientEnd(e.target.value)} style={{ width: '32px', height: '32px', borderRadius: '6px', border: '1px solid var(--border2)', cursor: 'pointer', padding: '2px', background: 'none' }} />
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text)' }}>{gradientEnd.toUpperCase()}</span>
+                </div>
+                <div style={{ width: '100px', height: '28px', borderRadius: '6px', background: gradientCss, border: '1px solid var(--border)' }} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -266,33 +395,87 @@ const [base, setBase]     = useState('#6366f1');
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" fill="currentColor" opacity="0.3"/><path d="M12 6v2m0 8v2m4-6h2M4 12H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
             Contrast
           </button>
+          <button onClick={() => setShowImageImport(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            From Image
+          </button>
+          <button onClick={copyShareLink} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', background: linkCopied ? 'var(--surface2)' : 'var(--surface)', color: linkCopied ? 'var(--clr)' : 'var(--muted)', border: `1px solid ${linkCopied ? 'var(--border2)' : 'var(--border)'}`, fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
+            {linkCopied ? <Icons.Check size={15} color="currentColor" /> : <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+            {linkCopied ? 'Link Copied!' : 'Share via URL'}
+          </button>
         </div>
 
+        {/* Image Import Modal */}
+        {showImageImport && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowImageImport(false)}>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: '16px', padding: '32px', maxWidth: '420px', width: '90%' }} onClick={e => e.stopPropagation()}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: '700', marginBottom: '12px', color: 'var(--text)' }}>Extract from Image</div>
+              <p style={{ color: 'var(--muted)', fontSize: '13px', marginBottom: '20px', lineHeight: '1.5' }}>Upload an image to extract its dominant colors and create your palette.</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                disabled={isExtracting}
+                style={{ display: 'none' }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isExtracting}
+                style={{ width: '100%', padding: '14px', borderRadius: '10px', background: isExtracting ? 'var(--surface2)' : 'var(--clr)', color: isExtracting ? 'var(--muted)' : '#000', border: 'none', fontWeight: '700', fontSize: '14px', cursor: isExtracting ? 'default' : 'pointer' }}
+              >
+                {isExtracting ? 'Extracting colors...' : 'Choose Image'}
+              </button>
+              <button onClick={() => setShowImageImport(false)} style={{ width: '100%', marginTop: '10px', padding: '10px', borderRadius: '10px', background: 'none', color: 'var(--muted)', border: 'none', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
+            </div>
+          </div>
+        )}
+
         {/* Palette swatches */}
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '24px' }}>
-          {palette.map((color, i) => (
-            <div key={i} style={{ flex: '1 1 130px', minWidth: '110px', borderRadius: '14px', overflow: 'hidden', border: '1px solid var(--border)', transition: 'transform var(--transition)', cursor: 'default' }}
-              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
-              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-            >
-              <div style={{ height: '110px', background: color, position: 'relative', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', padding: '8px' }}>
-                <button onClick={() => toggleLock(i)} style={{ width: '28px', height: '28px', borderRadius: '6px', background: locked[i] ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.3)', border: locked[i] ? '1px solid rgba(255,255,255,0.5)' : '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all var(--transition)' }}>
-                  {locked[i] ? <Icons.Lock size={12} color="#fff" /> : <Icons.Unlock size={12} color="rgba(255,255,255,0.6)" />}
-                </button>
-              </div>
-              <div style={{ background: 'var(--surface2)', padding: '12px', borderTop: '1px solid var(--border)' }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: '700', marginBottom: '8px', color: 'var(--text)', letterSpacing: '0.04em' }}>{color.toUpperCase()}</div>
-                <button onClick={() => copyHex(color, i)} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '5px', background: copied===i ? 'var(--surface)' : 'var(--surface)', color: copied===i ? 'var(--clr)' : 'var(--muted)', border: `1px solid ${copied===i ? 'var(--border2)' : 'var(--border)'}`, fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-mono)', width: '100%', justifyContent: 'center', transition: 'all var(--transition)' }}>
-                  {copied===i ? <Icons.Check size={11} color="currentColor" /> : <Icons.Copy size={11} color="currentColor" />}
-                  {copied===i ? 'Copied' : 'Copy Hex'}
-                </button>
+        {mode === 'gradient' ? (
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+            <div style={{ flex: 1, height: '180px', borderRadius: '14px', background: gradientCss, border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', bottom: '16px', left: '16px', right: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: '700', color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.5)', letterSpacing: '0.04em' }}>{gradientStart.toUpperCase()}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: '700', color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.5)', letterSpacing: '0.04em' }}>{gradientEnd.toUpperCase()}</div>
               </div>
             </div>
-          ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button onClick={() => copyHex(gradientStart, 'gstart')} style={{ padding: '8px 16px', borderRadius: '8px', background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
+                {copied === 'gstart' ? 'Copied!' : `Copy ${gradientStart.toUpperCase()}`}
+              </button>
+              <button onClick={() => copyHex(gradientEnd, 'gend')} style={{ padding: '8px 16px', borderRadius: '8px', background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border)', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
+                {copied === 'gend' ? 'Copied!' : `Copy ${gradientEnd.toUpperCase()}`}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '24px' }}>
+            {palette.map((color, i) => (
+              <div key={i} style={{ flex: '1 1 130px', minWidth: '110px', borderRadius: '14px', overflow: 'hidden', border: '1px solid var(--border)', transition: 'transform var(--transition)', cursor: 'default' }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                <div style={{ height: '110px', background: color, position: 'relative', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', padding: '8px' }}>
+                  <button onClick={() => toggleLock(i)} style={{ width: '28px', height: '28px', borderRadius: '6px', background: locked[i] ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.3)', border: locked[i] ? '1px solid rgba(255,255,255,0.5)' : '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all var(--transition)' }}>
+                    {locked[i] ? <Icons.Lock size={12} color="#fff" /> : <Icons.Unlock size={12} color="rgba(255,255,255,0.6)" />}
+                  </button>
+                </div>
+                <div style={{ background: 'var(--surface2)', padding: '12px', borderTop: '1px solid var(--border)' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: '700', marginBottom: '8px', color: 'var(--text)', letterSpacing: '0.04em' }}>{color.toUpperCase()}</div>
+                  <button onClick={() => copyHex(color, i)} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '5px', background: copied===i ? 'var(--surface)' : 'var(--surface)', color: copied===i ? 'var(--clr)' : 'var(--muted)', border: `1px solid ${copied===i ? 'var(--border2)' : 'var(--border)'}`, fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-mono)', width: '100%', justifyContent: 'center', transition: 'all var(--transition)' }}>
+                    {copied===i ? <Icons.Check size={11} color="currentColor" /> : <Icons.Copy size={11} color="currentColor" />}
+                    {copied===i ? 'Copied' : 'Copy Hex'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         </div>
 
         {/* Contrast Checker */}
-        {showContrast && palette.length > 0 && (
+        {showContrast && palette.length > 0 && mode !== 'gradient' && (
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden', marginBottom: '24px' }}>
             <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span className="label" style={{ color: 'var(--clr)' }}>WCAG Contrast Ratios</span>
@@ -353,11 +536,11 @@ const [base, setBase]     = useState('#6366f1');
         {/* CSS Preview */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
           <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="label" style={{ color: 'var(--clr)' }}>CSS Variables</span>
+            <span className="label" style={{ color: 'var(--clr)' }}>{mode === 'gradient' ? 'CSS Gradient' : 'CSS Variables'}</span>
             <button onClick={exportCSS} style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}>copy</button>
           </div>
           <pre style={{ padding: '16px', margin: 0, fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--muted)', lineHeight: '1.8', overflowX: 'auto' }}>
-{`:root {\n${palette.map((c,i)=>`  --color-${i+1}: ${c};`).join('\n')}\n}`}
+{mode === 'gradient' ? `background: ${gradientCss};` : `:root {\n${palette.map((c,i)=>`  --color-${i+1}: ${c};`).join('\n')}\n}`}
           </pre>
         </div>
       </main>
