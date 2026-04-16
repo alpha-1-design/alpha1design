@@ -45,6 +45,7 @@ export default function Header({ onAction }) {
     router.pathname.startsWith('/ai')          ? 'var(--ai)'  :
     router.pathname.startsWith('/image/bulk')  ? 'var(--img)' :
     router.pathname.startsWith('/image')       ? 'var(--img)' :
+    router.pathname.startsWith('/collage')     ? 'var(--img)' :
     router.pathname.startsWith('/design')      ? 'var(--clr)' :
     router.pathname.startsWith('/fonts')       ? '#8b5cf6'    : 'var(--text)';
 
@@ -52,9 +53,10 @@ export default function Header({ onAction }) {
     { href: '/ai',         label: 'AI',      icon: 'AI'      },
     { href: '/image',      label: 'Compress', icon: 'Image'  },
     { href: '/image/bulk', label: 'Bulk',     icon: 'Compress'},
+    { href: '/collage',    label: 'Collage',  icon: 'Image'  },
     { href: '/design',     label: 'Palette',  icon: 'Palette' },
-    { href: '/fonts',      label: 'Fonts',    icon: 'AI'      },
-    { href: '/',           label: 'Home',     icon: 'Home'    },
+    { href: '/fonts',     label: 'Fonts',    icon: 'AI'      },
+    { href: '/',          label: 'Home',     icon: 'Home'    },
   ];
 
   return (

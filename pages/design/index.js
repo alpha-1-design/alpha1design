@@ -351,7 +351,7 @@ const [base, setBase]     = useState('#6366f1');
                 <div style={{ width: '100px', height: '28px', borderRadius: '6px', background: gradientCss, border: '1px solid var(--border)' }} />
               </div>
             )}
-          </div>
+</div>
         </div>
 
         {/* Action buttons */}
@@ -472,7 +472,6 @@ const [base, setBase]     = useState('#6366f1');
             ))}
           </div>
         )}
-        </div>
 
         {/* Contrast Checker */}
         {showContrast && palette.length > 0 && mode !== 'gradient' && (

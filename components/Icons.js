@@ -187,6 +187,12 @@ export const Icons = {
       <path d="M19 8L17 5M7 19L5 16" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
     </svg>
   ),
+
+  Plus: ({ size = 16, color = 'currentColor' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 5V19M5 12H19" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
 };
 
 export default Icons;
