@@ -32,15 +32,10 @@ jobs:
           tr -d '\n\r ' < secret_base64.txt | base64 -d > alpha1design.jks
           rm secret_base64.txt
 
-      - name: Initialize Bubblewrap
-        run: |
-          # Using the --yes flag to skip all prompts
-          bubblewrap init --yes --config twa-cli.json --app-id com.alpha1design.studio
-
       - name: Build APK
         run: |
-          # Using the secret password for signing
-          bubblewrap build --keystore alpha1design.jks --keypass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" --storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+          # Skip bubblewrap init and try to build directly using the config file
+          bubblewrap build --config twa-cli.json --keystore alpha1design.jks --keypass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" --storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
