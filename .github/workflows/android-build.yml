@@ -54,7 +54,6 @@ jobs:
           expect "Do you want Bubblewrap to install the Android SDK"
           send "Yes\r"
 
-          # Loop to handle all license and installation prompts
           expect {
             "agree to the Android SDK terms" { send "Yes\r"; exp_continue }
             "Accept" { send "Yes\r"; exp_continue }
@@ -67,6 +66,13 @@ jobs:
 
           chmod +x build_apk.exp
           ./build_apk.exp "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" "$JAVA_HOME"
+
+      - name: Debug File System
+        if: always()
+        run: |
+          echo "Listing all files to find the APK..."
+          find . -name "*.apk"
+          ls -R
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
