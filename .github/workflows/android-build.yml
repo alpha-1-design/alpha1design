@@ -45,16 +45,10 @@ jobs:
 
           spawn bubblewrap build --config twa-cli.json --keystore alpha1design.jks --keypass "$keypass" --storepass "$storepass"
 
-          expect "Do you want Bubblewrap to install the JDK"
-          send "No\r"
-
-          expect "Path to your existing JDK 17"
-          send "$java_home\r"
-
-          expect "Do you want Bubblewrap to install the Android SDK"
-          send "Yes\r"
-
           expect {
+            "Do you want Bubblewrap to install the JDK" { send "No\r"; exp_continue }
+            "Path to your existing JDK 17" { send "$java_home\r"; exp_continue }
+            "Do you want Bubblewrap to install the Android SDK" { send "Yes\r"; exp_continue }
             "agree to the Android SDK terms" { send "Yes\r"; exp_continue }
             "Accept" { send "Yes\r"; exp_continue }
             "Do you want to install" { send "Yes\r"; exp_continue }
