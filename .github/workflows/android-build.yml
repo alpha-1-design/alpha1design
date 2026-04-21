@@ -54,10 +54,13 @@ jobs:
           expect "Do you want Bubblewrap to install the Android SDK"
           send "Yes\r"
 
-          # Handle potential subsequent SDK-related prompts
+          # Loop to handle all license and installation prompts
           expect {
+            "agree to the Android SDK terms" { send "Yes\r"; exp_continue }
             "Accept" { send "Yes\r"; exp_continue }
             "Do you want to install" { send "Yes\r"; exp_continue }
+            "agree" { send "Yes\r"; exp_continue }
+            "license" { send "Yes\r"; exp_continue }
             eof
           }
           EOF
