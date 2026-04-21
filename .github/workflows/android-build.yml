@@ -34,19 +34,13 @@ jobs:
 
       - name: Initialize Bubblewrap
         run: |
-          # Bubblewrap init is too interactive for standard piping.
-          # We use 'yes' to provide the same answer repeatedly, but here we need different answers.
-          # The most reliable way for Bubblewrap is often just to use the existing config without 'init' if possible,
-          # but 'init' is required to generate the project.
-          # Let's try using a more aggressive expect-like approach with a simple python script.
           python3 -c "
-          import subprocess
+          import subprocess, os
+          java_home = os.environ.get('JAVA_HOME', '')
           p = subprocess.Popen(['bubblewrap', 'init', '--config', 'twa-cli.json', '--app-id', 'com.alpha1design.studio'],
                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
           p.stdin.write('No\n')
-          p.stdin.flush()
-          # Wait a bit for the JDK prompt
-          p.stdin.write('''' + subprocess.os.environ.get('JAVA_HOME', '') + '\n'')
+          p.stdin.write(java_home + '\n')
           p.stdin.flush()
           p.stdin.close()
           stdout, stderr = p.communicate()
