@@ -36,7 +36,6 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y expect
 
-          # We pass the secrets as arguments to the script to avoid 'no such variable' errors in expect
           cat << 'EOF' > build_apk.exp
           #!/usr/bin/expect -f
           set timeout -1
@@ -45,11 +44,22 @@ jobs:
           set java_home [lindex $argv 2]
 
           spawn bubblewrap build --config twa-cli.json --keystore alpha1design.jks --keypass "$keypass" --storepass "$storepass"
+
           expect "Do you want Bubblewrap to install the JDK"
           send "No\r"
+
           expect "Path to your existing JDK 17"
           send "$java_home\r"
-          expect eof
+
+          expect "Do you want Bubblewrap to install the Android SDK"
+          send "Yes\r"
+
+          # Handle potential subsequent SDK-related prompts
+          expect {
+            "Accept" { send "Yes\r"; exp_continue }
+            "Do you want to install" { send "Yes\r"; exp_continue }
+            eof
+          }
           EOF
 
           chmod +x build_apk.exp
