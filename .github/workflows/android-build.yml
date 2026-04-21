@@ -34,9 +34,12 @@ jobs:
 
       - name: Initialize Bubblewrap
         run: |
-          # Bubblewrap asks for "No" then the path to the JDK
-          # setup-java sets JAVA_HOME, which we provide as the path
-          printf "No\n%s\n" "$JAVA_HOME" | bubblewrap init --config twa-cli.json --app-id com.alpha1design.studio
+          # Use a heredoc to pass multiple lines of input
+          # bubblewrap init can be temperamental with printf in some shell environments
+          cat <<<EOFEOF | bubblewrap init --config twa-cli.json --app-id com.alpha1design.studio
+No
+$JAVA_HOME
+EOF
 
       - name: Build APK
         run: |
