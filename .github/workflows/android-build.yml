@@ -34,8 +34,10 @@ jobs:
 
       - name: Build APK
         run: |
-          # Skip bubblewrap init and try to build directly using the config file
-          bubblewrap build --config twa-cli.json --keystore alpha1design.jks --keypass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" --storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+          # Use a temporary file to feed "No" to Bubblewrap's mandatory JDK check
+          echo "No" > jdk_answer.txt
+          bubblewrap build --config twa-cli.json --keystore alpha1design.jks --keypass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" --storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" < jdk_answer.txt
+          rm jdk_answer.txt
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
