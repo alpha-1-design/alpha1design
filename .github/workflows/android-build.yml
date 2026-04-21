@@ -28,7 +28,7 @@ jobs:
 
       - name: Prepare Keystore
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > alpha1design.jks
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | tr -d '\n\r ' | base64 -d > alpha1design.jks
 
       - name: Initialize Bubblewrap
         run: |
