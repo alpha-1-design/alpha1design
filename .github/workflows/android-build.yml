@@ -1,0 +1,47 @@
+name: Android Build (TWA)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Bubblewrap
+        run: npm install -g @bubblewrap/cli
+
+      - name: Prepare Keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > alpha1design.jks
+
+      - name: Initialize Bubblewrap
+        run: |
+          # Using the config file and overriding the package name
+          bubblewrap init --config twa-cli.json --app-id com.alpha1design.studio
+
+      - name: Build APK
+        run: |
+          # Using the secret password for signing
+          bubblewrap build --keystore alpha1design.jks --keypass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" --storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: alpha1design-apk
+          path: "**/*.apk"
