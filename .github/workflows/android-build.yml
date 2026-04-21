@@ -34,18 +34,8 @@ jobs:
 
       - name: Initialize Bubblewrap
         run: |
-          python3 -c "
-          import subprocess, os
-          java_home = os.environ.get('JAVA_HOME', '')
-          p = subprocess.Popen(['bubblewrap', 'init', '--config', 'twa-cli.json', '--app-id', 'com.alpha1design.studio'],
-                               stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-          input_str = 'No\n' + java_home + '\n'
-          stdout, stderr = p.communicate(input=input_str)
-          print(stdout)
-          print(stderr)
-          if p.returncode != 0:
-              exit(p.returncode)
-          "
+          # Using the --yes flag to skip all prompts
+          bubblewrap init --yes --config twa-cli.json --app-id com.alpha1design.studio
 
       - name: Build APK
         run: |
