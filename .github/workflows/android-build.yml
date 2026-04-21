@@ -34,12 +34,10 @@ jobs:
 
       - name: Initialize Bubblewrap
         run: |
-          # Use a heredoc to pass multiple lines of input
-          # bubblewrap init can be temperamental with printf in some shell environments
-          cat <<<EOFEOF | bubblewrap init --config twa-cli.json --app-id com.alpha1design.studio
-No
-$JAVA_HOME
-EOF
+          echo "No" > inputs.txt
+          echo "$JAVA_HOME" >> inputs.txt
+          bubblewrap init --config twa-cli.json --app-id com.alpha1design.studio < inputs.txt
+          rm inputs.txt
 
       - name: Build APK
         run: |
