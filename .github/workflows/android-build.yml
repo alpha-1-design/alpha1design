@@ -34,10 +34,11 @@ jobs:
 
       - name: Build APK
         run: |
-          # Use a temporary file to feed "No" to Bubblewrap's mandatory JDK check
-          echo "No" > jdk_answer.txt
-          bubblewrap build --config twa-cli.json --keystore alpha1design.jks --keypass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" --storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" < jdk_answer.txt
-          rm jdk_answer.txt
+          # Bubblewrap requires 'No' AND the path to the JDK during the build step
+          echo "No" > jdk_answers.txt
+          echo "$JAVA_HOME" >> jdk_answers.txt
+          bubblewrap build --config twa-cli.json --keystore alpha1design.jks --keypass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" --storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" < jdk_answers.txt
+          rm jdk_answers.txt
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
