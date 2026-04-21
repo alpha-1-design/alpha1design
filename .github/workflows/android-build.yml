@@ -35,18 +35,25 @@ jobs:
       - name: Build APK
         run: |
           sudo apt-get update && sudo apt-get install -y expect
+
+          # We pass the secrets as arguments to the script to avoid 'no such variable' errors in expect
           cat << 'EOF' > build_apk.exp
           #!/usr/bin/expect -f
           set timeout -1
-          spawn bubblewrap build --config twa-cli.json --keystore alpha1design.jks --keypass "$env(ANDROID_KEYSTORE_PASSWORD)" --storepass "$env(ANDROID_KEYSTORE_PASSWORD)"
+          set keypass [lindex $argv 0]
+          set storepass [lindex $argv 1]
+          set java_home [lindex $argv 2]
+
+          spawn bubblewrap build --config twa-cli.json --keystore alpha1design.jks --keypass "$keypass" --storepass "$storepass"
           expect "Do you want Bubblewrap to install the JDK"
           send "No\r"
           expect "Path to your existing JDK 17"
-          send "$env(JAVA_HOME)\r"
+          send "$java_home\r"
           expect eof
           EOF
+
           chmod +x build_apk.exp
-          ./build_apk.exp
+          ./build_apk.exp "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" "$JAVA_HOME"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
