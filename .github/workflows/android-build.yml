@@ -34,8 +34,9 @@ jobs:
 
       - name: Initialize Bubblewrap
         run: |
-          # Use the --yes flag to auto-confirm prompts
-          echo "No" | bubblewrap init --config twa-cli.json --app-id com.alpha1design.studio
+          # Bubblewrap asks for "No" then the path to the JDK
+          # setup-java sets JAVA_HOME, which we provide as the path
+          printf "No\n%s\n" "$JAVA_HOME" | bubblewrap init --config twa-cli.json --app-id com.alpha1design.studio
 
       - name: Build APK
         run: |
