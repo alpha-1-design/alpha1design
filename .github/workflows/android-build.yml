@@ -34,32 +34,69 @@ jobs:
 
       - name: Build APK
         run: |
-          sudo apt-get update && sudo apt-get install -y expect
+          python3 -c "
+          import subprocess, os, pty, select
 
-          cat << 'EOF' > build_apk.exp
-          #!/usr/bin/expect -f
-          set timeout -1
-          set keypass [lindex $argv 0]
-          set storepass [lindex $argv 1]
-          set java_home [lindex $argv 2]
+          java_home = os.environ.get('JAVA_HOME', '')
+          cmd = ['bubblewrap', 'build', '--config', 'twa-cli.json', '--keystore', 'alpha1design.jks', '--keypass', os.environ.get('ANDROID_KEYSTORE_PASSWORD', ''), '--storepass', os.environ.get('ANDROID_KEYSTORE_PASSWORD', '')]
 
-          spawn bubblewrap build --config twa-cli.json --keystore alpha1design.jks --keypass "$keypass" --storepass "$storepass"
+          # Use pty.spawn to fool bubblewrap into thinking it has a real terminal
+          pid = pty.fork()
+          if pid == 0:
+              import sys
+              subprocess.run(cmd)
+              sys.exit(0)
 
-          expect {
-            "Do you want Bubblewrap to install the JDK" { send "No\r"; exp_continue }
-            "Path to your existing JDK 17" { send "$java_home\r"; exp_continue }
-            "Do you want Bubblewrap to install the Android SDK" { send "Yes\r"; exp_continue }
-            "agree to the Android SDK terms" { send "Yes\r"; exp_continue }
-            "Accept" { send "Yes\r"; exp_continue }
-            "Do you want to install" { send "Yes\r"; exp_continue }
-            "agree" { send "Yes\r"; exp_continue }
-            "license" { send "Yes\r"; exp_continue }
-            eof
-          }
-          EOF
+          import termios
+          import tty
 
-          chmod +x build_apk.exp
-          ./build_apk.exp "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" "$JAVA_HOME"
+          # This is a simplified automation loop using the PTY
+          # We will send the responses and wait for the process to exit
+          def send_input(text):
+              # In a real pty we would read the buffer, but for this we'll send a sequence
+              pass
+
+          # Since we are in a GitHub Action, the most reliable way to handle
+          # these specific prompts without 'expect' is to use a combined input stream
+          # but Bubblewrap ignores simple pipes.
+          # Let's fall back to a simpler python subprocess with a combined input
+          "
+          # Actually, the most reliable way without 'expect' is using a python script that
+          # uses subprocess.Popen and writes to stdin.
+          python3 -c "
+          import subprocess, os
+          java_home = os.environ.get('JAVA_HOME', '')
+          p = subprocess.Popen(['bubblewrap', 'build', '--config', 'twa-cli.json', '--keystore', 'alpha1design.jks', '--keypass', os.environ.get('ANDROID_KEYSTORE_PASSWORD', ''), '--storepass', os.environ.get('ANDROID_KEYSTORE_PASSWORD', '')],
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+
+          responses = ['No\n', java_home + '\n', 'Yes\n', 'Yes\n', 'Yes\n', 'Yes\n']
+          res_idx = 0
+
+          while True:
+              line = p.stdout.readline()
+              if not line: break
+              print(line, end='')
+              if 'install the JDK' in line and res_idx < len(responses):
+                  p.stdin.write(responses[res_idx])
+                  p.stdin.flush()
+                  res_idx += 1
+              elif 'Path to your existing JDK' in line and res_idx < len(responses):
+                  p.stdin.write(responses[res_idx])
+                  p.stdin.flush()
+                  res_idx += 1
+              elif 'install the Android SDK' in line and res_idx < len(responses):
+                  p.stdin.write(responses[res_idx])
+                  p.stdin.flush()
+                  res_idx += 1
+              elif ('terms' in line or 'agree' in line or 'license' in line) and res_idx < len(responses):
+                  p.stdin.write(responses[res_idx])
+                  p.stdin.flush()
+                  res_idx += 1
+
+          p.wait()
+          if p.returncode != 0:
+              exit(p.returncode)
+          "
 
       - name: Debug File System
         if: always()
