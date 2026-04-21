@@ -34,11 +34,19 @@ jobs:
 
       - name: Build APK
         run: |
-          # Bubblewrap requires 'No' AND the path to the JDK during the build step
-          echo "No" > jdk_answers.txt
-          echo "$JAVA_HOME" >> jdk_answers.txt
-          bubblewrap build --config twa-cli.json --keystore alpha1design.jks --keypass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" --storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" < jdk_answers.txt
-          rm jdk_answers.txt
+          sudo apt-get update && sudo apt-get install -y expect
+          cat << 'EOF' > build_apk.exp
+          #!/usr/bin/expect -f
+          set timeout -1
+          spawn bubblewrap build --config twa-cli.json --keystore alpha1design.jks --keypass "$env(ANDROID_KEYSTORE_PASSWORD)" --storepass "$env(ANDROID_KEYSTORE_PASSWORD)"
+          expect "Do you want Bubblewrap to install the JDK"
+          send "No\r"
+          expect "Path to your existing JDK 17"
+          send "$env(JAVA_HOME)\r"
+          expect eof
+          EOF
+          chmod +x build_apk.exp
+          ./build_apk.exp
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
