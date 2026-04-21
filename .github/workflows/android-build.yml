@@ -34,8 +34,8 @@ jobs:
 
       - name: Initialize Bubblewrap
         run: |
-          # Using the config file and overriding the package name
-          bubblewrap init --config twa-cli.json --app-id com.alpha1design.studio
+          # Use the --yes flag to auto-confirm prompts
+          echo "No" | bubblewrap init --config twa-cli.json --app-id com.alpha1design.studio
 
       - name: Build APK
         run: |
